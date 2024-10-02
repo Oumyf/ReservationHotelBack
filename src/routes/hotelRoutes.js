@@ -8,4 +8,6 @@ router.get('/hotels/:id', hotelController.getHotelById);
 router.put('/hotels/:id', hotelController.updateHotel);
 router.delete('/hotels/:id', hotelController.deleteHotel);
 
+
+
 module.exports = router;
