@@ -1,38 +1,29 @@
 const mongoose = require('mongoose');
-const Reservation = require('../models/reservations'); // Import du modèle de réservation
-// const nodemailer = require('nodemailer');
+const nodemailer = require('nodemailer');
+const Reservation = require('../models/reservations');
+const http = require('http');
+const express = require('express');
+const app = express();
+const server = http.createServer(app);
+const io = require('socket.io')(server);
 
+// Create the transporter
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'adiaratououmyfall@gmail.com',
+        pass: 'dcds ddsw phyg vhyy', // Use app-specific password if needed
+    },
+});
 
-
-// Configuration du transporteur
-// let transporter = nodemailer.createTransport({
-//     host: 'smtp.gmail.com',
-//     port: 587,
-//     secure: false,
-//     auth: {
-//         user: process.env.EMAIL_USER,
-//         pass: process.env.EMAIL_PASSWORD,
-//     },
-// });
-
-// // Vérification de la connexion
-// transporter.verify((error, success) => {
-//     if (error) {
-//         console.error("Erreur de connexion au serveur SMTP :", error);
-//     } else {
-//         console.log("Connexion au serveur SMTP réussie !");
-//     }
-// });
-
-// Créer une réservation
-exports.createReservation = async (req, res) => {
+// Create a reservation
+const createReservation = async (req, res) => {
     try {
-        // Validation des données entrantes
+        // Validate incoming data
         if (!req.body.user_id || !req.body.hotel_id || !req.body.date_debut || !req.body.date_fin || !req.body.statut || !req.body.email || !req.body.nom) {
             return res.status(400).json({ message: "Tous les champs sont requis." });
         }
 
-        // Créer une nouvelle réservation
         const newReservation = new Reservation({
             user_id: new mongoose.Types.ObjectId(req.body.user_id),
             hotel_id: new mongoose.Types.ObjectId(req.body.hotel_id),
@@ -42,29 +33,28 @@ exports.createReservation = async (req, res) => {
         });
 
         const savedReservation = await newReservation.save();
+        io.emit('new_notification', { message: `Réservation réussie pour ${req.body.nom}` });
 
-        // Configuration de l'email
-        // let mailOptions = {
-        //     from: process.env.EMAIL_USER,
-        //     to: req.body.email,
-        //     subject: 'Confirmation de réservation - Keur Teranga',
-        //     text: `Bonjour ${req.body.nom},\n\nMerci d'avoir réservé chez Keur Teranga.\nVoici les détails de votre réservation:\n- Date de début: ${req.body.date_debut}\n- Date de fin: ${req.body.date_fin}\n\nÀ très bientôt !`,
-        // };
+        let mailOptions = {
+            from: 'adiaratououmyfall@gmail.com',
+            to: req.body.email,
+            subject: 'Confirmation de réservation',
+            text: `Votre réservation pour ${req.body.nom} a été réussie.`,
+        };
 
-        // Envoi de l'email
-        // await transporter.sendMail(mailOptions);
-        
-        // Réponse de succès
+        await transporter.sendMail(mailOptions);
         res.status(201).json(savedReservation);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Erreur lors de la création de la réservation", error: error.message });
+        socket.on("connect_error", (error) => {
+            console.error("Socket connection error:", error);
+        });
     }
 };
 
-
 // Récupérer toutes les réservations
-exports.getReservations = async (req, res) => {
+const getReservations = async (req, res) => {
     try {
         const reservations = await Reservation.find();
         res.status(200).json(reservations);
@@ -74,7 +64,7 @@ exports.getReservations = async (req, res) => {
 };
 
 // Récupérer une réservation par ID
-exports.getReservationById = async (req, res) => {
+const getReservationById = async (req, res) => {
     try {
         const reservation = await Reservation.findById(req.params.id);
         if (!reservation) {
@@ -87,7 +77,7 @@ exports.getReservationById = async (req, res) => {
 };
 
 // Mettre à jour une réservation
-exports.updateReservation = async (req, res) => {
+const updateReservation = async (req, res) => {
     try {
         const updatedReservation = await Reservation.findByIdAndUpdate(
             req.params.id,
@@ -112,7 +102,7 @@ exports.updateReservation = async (req, res) => {
 };
 
 // Supprimer une réservation
-exports.deleteReservation = async (req, res) => {
+const deleteReservation = async (req, res) => {
     try {
         const deletedReservation = await Reservation.findByIdAndDelete(req.params.id);
 
@@ -124,4 +114,12 @@ exports.deleteReservation = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: "Erreur lors de la suppression de la réservation", error: error.message });
     }
+};
+
+module.exports = {
+    createReservation,
+    getReservations,
+    getReservationById,
+    updateReservation,
+    deleteReservation,
 };
