@@ -1,6 +1,9 @@
 const Chambre = require('../models/chambre');
 const multer = require('multer');
 const path = require('path');
+const verifyHotelOwnership = require('../middleware/verifyHotelOwnerShip');
+
+
 
 // Configuration de multer pour le téléversement des images
 const storage = multer.diskStorage({
@@ -27,9 +30,9 @@ exports.createChambre = async (req, res) => {
             prix: req.body.prix,
             description: req.body.description,
             disponibilite: req.body.disponibilite,
-            hotelId: req.body.hotelId,
-            image: req.file.path, // Enregistrer le chemin de l'image
-            nombreDePersonnes: req.body.nombreDePersonnes, // Nombre de personnes
+            hotelId: req.user.id,  // Utiliser l'ID de l'hôtel connecté
+            image: req.file.path,  // Enregistrer le chemin de l'image
+            nombreDePersonnes: req.body.nombreDePersonnes,  // Nombre de personnes
         });
         await nouvelleChambre.save();
         res.status(201).json(nouvelleChambre);
@@ -71,31 +74,37 @@ exports.getChambresByHotelId = async (req, res) => {
     }
 };
 
-// Mettre à jour une chambre
-exports.updateChambre = async (req, res) => {
-    try {
-        const chambre = await Chambre.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!chambre) {
-            return res.status(404).json({ message: 'Chambre non trouvée' });
+// Mettre à jour une chambre (avec vérification de propriété)
+exports.updateChambre = [
+    verifyHotelOwnership,  // Vérification de l'hôtel propriétaire
+    async (req, res) => {
+        try {
+            const chambre = await Chambre.findByIdAndUpdate(req.params.id, req.body, { new: true });
+            if (!chambre) {
+                return res.status(404).json({ message: 'Chambre non trouvée' });
+            }
+            res.status(200).json(chambre);
+        } catch (error) {
+            res.status(400).json({ message: error.message });
         }
-        res.status(200).json(chambre);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
     }
-};
+];
 
-// Supprimer une chambre
-exports.deleteChambre = async (req, res) => {
-    try {
-        const chambre = await Chambre.findByIdAndDelete(req.params.id);
-        if (!chambre) {
-            return res.status(404).json({ message: 'Chambre non trouvée' });
+// Supprimer une chambre (avec vérification de propriété)
+exports.deleteChambre = [
+    verifyHotelOwnership,  // Vérification de l'hôtel propriétaire
+    async (req, res) => {
+        try {
+            const chambre = await Chambre.findByIdAndDelete(req.params.id);
+            if (!chambre) {
+                return res.status(404).json({ message: 'Chambre non trouvée' });
+            }
+            res.status(204).send();  // No content response for successful deletion
+        } catch (error) {
+            res.status(500).json({ message: error.message });
         }
-        res.status(204).send(); // No content response for successful deletion
-    } catch (error) {
-        res.status(500).json({ message: error.message });
     }
-};
+];
 
 // Exporter le middleware multer pour l'utiliser dans les routes
 module.exports.upload = upload;
