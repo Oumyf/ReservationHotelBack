@@ -1,94 +1,96 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid'); // To generate unique ids
 const User = require('../models/user');
 const router = express.Router();
 
 // Route d'inscription
 router.post('/register', async (req, res) => {
-    const { id, nom, email, password, role, telephone, adresse } = req.body;
+    const { nom, email, password, telephone, adresse, role } = req.body;
 
     // Validation des entrées
-    if (!id || !nom || !email || !password || !role || !telephone || !adresse) {
-        return res.status(400).json({ message: 'Tous les champs sont requis.' });
-    }
-
-    // Vérification des rôles
-    const validRoles = ['user', 'admin', 'hotel'];
-    if (!validRoles.includes(role)) {
-        return res.status(400).json({ message: 'Rôle invalide.' });
+    if (!nom || !email || !password || !telephone || !adresse || !role) {
+        return res.status(400).json({ message: 'All fields are required.' });
     }
 
     try {
         // Vérification si l'utilisateur existe déjà
         const userExists = await User.findOne({ email });
         if (userExists) {
-            return res.status(400).json({ message: 'L’utilisateur existe déjà.' });
+            return res.status(400).json({ message: 'User already exists' });
         }
 
         // Hash du mot de passe
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Enregistrement de l'utilisateur
-        const newUser = new User({ id, nom, email, password: hashedPassword, role, telephone, adresse });
+        // Générer un ID unique
+        const userId = uuidv4();
+
+        // Enregistrement de l'utilisateur avec toutes les informations
+        const newUser = new User({
+            id: userId,
+            nom,
+            email,
+            password: hashedPassword,
+            telephone,
+            adresse,
+            role
+        });
         await newUser.save();
 
-        res.status(201).json({ message: 'Utilisateur enregistré avec succès', userId: newUser._id });
+        res.status(201).json({ message: 'User registered successfully', userId: newUser._id });
     } catch (error) {
-        console.error('Erreur lors de l\'inscription:', error);
-        res.status(500).json({ message: 'Erreur serveur', error });
+        console.error('Error during registration:', error); 
+        res.status(500).json({ message: 'Server error', error });
     }
 });
 
-// Route de connexion
+// Route de connexion (login)
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
+
+    // Validation des entrées
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required.' });
+    }
 
     try {
         // Vérifier si l'utilisateur existe
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(404).json({ message: 'Utilisateur non trouvé.' });
+            return res.status(400).json({ message: 'User not found' });
         }
 
-        // Vérifier le mot de passe
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ message: 'Mot de passe incorrect.' });
+        // Vérifier si le mot de passe est correct
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(400).json({ message: 'Invalid credentials' });
         }
 
         // Générer un token JWT
-        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
-            expiresIn: '1h'
+        const token = jwt.sign(
+            { id: user._id, email: user.email, role: user.role },
+            process.env.JWT_SECRET, // Utilise une clé secrète depuis les variables d'environnement
+            { expiresIn: '1h' } // Le token expire dans 1 heure
+        );
+
+        // Retourner le token et l'utilisateur
+        res.status(200).json({
+            message: 'Login successful',
+            token,
+            user: {
+                id: user._id,
+                nom: user.nom,
+                email: user.email,
+                role: user.role
+            }
         });
-
-        res.status(200).json({ token, user: { id: user._id, nom: user.nom, email: user.email, role: user.role, telephone: user.telephone, adresse: user.adresse } });
     } catch (error) {
-        res.status(500).json({ message: 'Erreur serveur', error: error.message });
+        console.error('Error during login:', error);
+        res.status(500).json({ message: 'Server error', error });
     }
 });
 
-// Route protégée
-router.get('/protected', verifyToken, (req, res) => {
-    res.status(200).json({ message: 'Vous avez accédé à une route protégée', user: req.user });
-});
-
-// Middleware pour vérifier le token JWT
-function verifyToken(req, res, next) {
-    const token = req.headers['authorization'];
-
-    if (!token || !token.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Accès refusé. Aucun token fourni.' });
-    }
-
-    try {
-        const decoded = jwt.verify(token.split(' ')[1], process.env.JWT_SECRET);
-        req.user = decoded;
-        next();
-    } catch (err) {
-        console.error('Token invalide:', err);
-        res.status(400).json({ message: 'Token invalide.' });
-    }
-}
 
 module.exports = router;

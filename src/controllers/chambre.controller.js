@@ -1,110 +1,102 @@
-const Chambre = require('../models/chambre');
+const Chambre = require('../models/chambre'); // Assuming you have a Chambre model
 const multer = require('multer');
-const path = require('path');
-const verifyHotelOwnership = require('../middleware/verifyHotelOwnerShip');
 
-
-
-// Configuration de multer pour le téléversement des images
+// Setup multer for image uploads
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/'); // Dossier où les images seront stockées
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname)); // Renommer le fichier avec un timestamp
-    }
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/'); 
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
 });
 
-const upload = multer({ storage });
+exports.upload = multer({ storage: storage });
 
-// Créer une nouvelle chambre
+
+// Create a new chambre
 exports.createChambre = async (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ message: 'Image est requise' });
+  try {
+    // Log les données reçues
+    console.log('Received body:', req.body);
+    console.log('Received file:', req.file);
+
+    const { nom, prix } = req.body;
+    if (!nom || prix <= 0) {
+      return res.status(400).json({ message: 'Nom et prix valides requis.' });
     }
 
-    try {
-        const nouvelleChambre = new Chambre({
-            nom: req.body.nom,
-            type: req.body.type,
-            prix: req.body.prix,
-            description: req.body.description,
-            disponibilite: req.body.disponibilite,
-            hotelId: req.user.id,  // Utiliser l'ID de l'hôtel connecté
-            image: req.file.path,  // Enregistrer le chemin de l'image
-            nombreDePersonnes: req.body.nombreDePersonnes,  // Nombre de personnes
-        });
-        await nouvelleChambre.save();
-        res.status(201).json(nouvelleChambre);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
+    const image = req.file ? req.file.path : null;
+
+    const newChambre = new Chambre({ ...req.body, image });
+    await newChambre.save();
+
+    res.status(201).json({ message: 'Chambre créée avec succès', chambre: newChambre });
+  } catch (error) {
+    console.error('Erreur lors de la création de la chambre:', error);
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
 };
 
-// Récupérer toutes les chambres
+// Get all chambres
 exports.getChambres = async (req, res) => {
-    try {
-        const chambres = await Chambre.find();
-        res.status(200).json(chambres);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+  try {
+    const chambres = await Chambre.find();
+    res.status(200).json(chambres);
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
 };
 
-// Récupérer une chambre par son ID
+// Get a single chambre by ID
 exports.getChambreById = async (req, res) => {
-    try {
-        const chambre = await Chambre.findById(req.params.id);
-        if (!chambre) {
-            return res.status(404).json({ message: 'Chambre non trouvée' });
-        }
-        res.status(200).json(chambre);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+  try {
+    const chambre = await Chambre.findById(req.params.id);
+    if (!chambre) {
+      return res.status(404).json({ message: 'Chambre non trouvée' });
     }
+    res.status(200).json(chambre);
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
 };
 
-// Récupérer les chambres d'un hôtel spécifique
+// Get all chambres by hotel ID
 exports.getChambresByHotelId = async (req, res) => {
-    try {
-        const chambres = await Chambre.find({ hotelId: req.params.hotelId });
-        res.status(200).json(chambres);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+  try {
+    const chambres = await Chambre.find({ hotelId: req.params.hotelId });
+    res.status(200).json(chambres);
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
 };
 
-// Mettre à jour une chambre (avec vérification de propriété)
-exports.updateChambre = [
-    verifyHotelOwnership,  // Vérification de l'hôtel propriétaire
-    async (req, res) => {
-        try {
-            const chambre = await Chambre.findByIdAndUpdate(req.params.id, req.body, { new: true });
-            if (!chambre) {
-                return res.status(404).json({ message: 'Chambre non trouvée' });
-            }
-            res.status(200).json(chambre);
-        } catch (error) {
-            res.status(400).json({ message: error.message });
-        }
-    }
-];
+// Update chambre by ID
+exports.updateChambre = async (req, res) => {
+  try {
+    const updatedData = req.body;
+    const updatedChambre = await Chambre.findByIdAndUpdate(req.params.id, updatedData, { new: true });
 
-// Supprimer une chambre (avec vérification de propriété)
-exports.deleteChambre = [
-    verifyHotelOwnership,  // Vérification de l'hôtel propriétaire
-    async (req, res) => {
-        try {
-            const chambre = await Chambre.findByIdAndDelete(req.params.id);
-            if (!chambre) {
-                return res.status(404).json({ message: 'Chambre non trouvée' });
-            }
-            res.status(204).send();  // No content response for successful deletion
-        } catch (error) {
-            res.status(500).json({ message: error.message });
-        }
+    if (!updatedChambre) {
+      return res.status(404).json({ message: 'Chambre non trouvée' });
     }
-];
 
-// Exporter le middleware multer pour l'utiliser dans les routes
-module.exports.upload = upload;
+    res.status(200).json({ message: 'Chambre mise à jour', chambre: updatedChambre });
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
+};
+
+// Delete chambre by ID
+exports.deleteChambre = async (req, res) => {
+  try {
+    const chambre = await Chambre.findByIdAndDelete(req.params.id);
+    if (!chambre) {
+      return res.status(404).json({ message: 'Chambre non trouvée' });
+    }
+
+    res.status(200).json({ message: 'Chambre supprimée avec succès' });
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
+};

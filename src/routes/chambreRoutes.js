@@ -11,3 +11,5 @@ router.put('/chambres/:id', chambreController.updateChambre);
 router.delete('/chambres/:id', chambreController.deleteChambre);
 
 module.exports = router;
+
+
