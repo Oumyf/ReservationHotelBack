@@ -1,5 +1,5 @@
 const Avis = require('../models/avis');
-const Service = require('../models/service');
+const Hotel = require('../models/hotel.model');
 
 // Créer un avis
 exports.createAvis = async (req, res) => {
@@ -8,7 +8,7 @@ exports.createAvis = async (req, res) => {
         await nouvelAvis.save();
 
         // Ajouter l'avis au service correspondant
-        await Service.findByIdAndUpdate(req.body.serviceId, { $push: { avis: nouvelAvis._id } });
+        await Hotel.findByIdAndUpdate(req.body.serviceId, { $push: { avis: nouvelAvis._id } });
 
         res.status(201).json(nouvelAvis);
     } catch (error) {

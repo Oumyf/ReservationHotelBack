@@ -1,10 +1,12 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
+const { v4: uuidv4 } = require('uuid');
+
 
 const userSchema = new Schema({
     id: {
         type: String,
-        required: true,
+        default: uuidv4, // Génère un UUID par défaut
         unique: true,
     },
     nom: {
@@ -23,7 +25,7 @@ const userSchema = new Schema({
     role: {
         type: String,
         required: true,
-        enum: ['user', 'admin', 'hotel'],
+        enum: ['client', 'admin', 'hotel'],
     },
     telephone: {
         type: String,
@@ -33,7 +35,7 @@ const userSchema = new Schema({
         type: String,
         required: true,
     },
-});
+}, { timestamps: true });
 
 const User = mongoose.model('User', userSchema);
 
