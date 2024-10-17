@@ -9,9 +9,9 @@ async function initiatePayment(amount, customerPhone, customerName, bookingId) {
         ref_command: bookingId, // Utiliser la réservation comme référence
         command_name: `Paiement réservation ${customerName}`,
         env: "test",
-        ipn_url: process.env.IPN_URL, // Assure-toi de définir cette variable d'environnement
-        success_url: process.env.SUCCESS_URL, // Assure-toi de définir cette variable d'environnement
-        cancel_url: process.env.CANCEL_URL, // Assure-toi de définir cette variable d'environnement
+        ipn_url: process.env.IPN_URL, 
+        success_url: process.env.SUCCESS_URL, 
+        cancel_url: process.env.CANCEL_URL, 
         custom_field: JSON.stringify({
             custom_field1: "Référence réservation",
             custom_field2: customerName
