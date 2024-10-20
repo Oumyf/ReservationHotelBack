@@ -110,6 +110,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 
+app.use('/api/paytech', require('././src/routes/paymentRoutes'));
 
 // Lancer le serveur HTTP
 server.listen(PORT, () => {

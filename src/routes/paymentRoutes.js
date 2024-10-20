@@ -1,20 +1,12 @@
+// routes/paytech.js
 const express = require('express');
-const { initiatePayment } = require('../PayementService');
 const router = express.Router();
+const PaytechController = require('../controllers/payement.controller');
 
-router.post('/pay', async (req, res) => {
-    console.log("Received payment request:", req.body); // Log the incoming request
-
-    const { amount, customerPhone, customerName, bookingId } = req.body;
-
-    try {
-        const paymentResponse = await initiatePayment(amount, customerPhone, customerName, bookingId);
-        res.json(paymentResponse); // Respond with payment details
-    } catch (error) {
-        console.error("Erreur lors du paiement:", error);
-        res.status(500).json({ message: 'Erreur lors du paiement' });
-    }
-});
-
+router.post('/initiate-payment', PaytechController.initiatePayment);
+router.post('/handle-notification', PaytechController.handleNotification);
+router.get('/payment-success', PaytechController.paymentSuccess);
+router.get('/payment-cancel/:id', PaytechController.paymentCancel);
+router.get('/verify-payment/:transactionId', PaytechController.verifyPayment);
 
 module.exports = router;

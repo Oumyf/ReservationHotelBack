@@ -3,6 +3,7 @@ const nodemailer = require('nodemailer');
 const Reservation = require('../models/reservations');
 const http = require('http');
 const express = require('express');
+const fetch = require('node-fetch'); // Import fetch for making HTTP requests
 const app = express();
 const server = http.createServer(app);
 const io = require('socket.io')(server);
@@ -12,47 +13,89 @@ const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
         user: 'adiaratououmyfall@gmail.com',
-        pass: 'dcds ddsw phyg vhyy', // Use app-specific password if needed
+        pass: 'dcds ddsw phyg vhyy', // Utilisez un mot de passe spécifique à l'application si nécessaire
     },
 });
 
 // Create a reservation
 const createReservation = async (req, res) => {
     try {
-        // Validate incoming data
-        if (!req.body.user_id || !req.body.hotel_id || !req.body.date_debut || !req.body.date_fin || !req.body.email || !req.body.nom) {
+        // Validation des données entrantes
+        const { user_id, hotel_id, date_debut, date_fin, email, nom } = req.body;
+        
+        if (!user_id || !hotel_id || !date_debut || !date_fin || !email || !nom) {
             const missingFields = [];
-            if (!req.body.user_id) missingFields.push('user_id');
-            if (!req.body.hotel_id) missingFields.push('hotel_id');
-            if (!req.body.date_debut) missingFields.push('date_debut');
-            if (!req.body.date_fin) missingFields.push('date_fin');
-            if (!req.body.email) missingFields.push('email');
-            if (!req.body.nom) missingFields.push('nom');
+            if (!user_id) missingFields.push('user_id');
+            if (!hotel_id) missingFields.push('hotel_id');
+            if (!date_debut) missingFields.push('date_debut');
+            if (!date_fin) missingFields.push('date_fin');
+            if (!email) missingFields.push('email');
+            if (!nom) missingFields.push('nom');
         
             return res.status(400).json({ message: "Tous les champs sont requis.", missingFields });
         }
-        
 
+        // Créer la réservation (statut par défaut 'pending')
         const newReservation = new Reservation({
-            user_id: new mongoose.Types.ObjectId(req.body.user_id),
-            hotel_id: new mongoose.Types.ObjectId(req.body.hotel_id),
-            date_debut: new Date(req.body.date_debut),
-            date_fin: new Date(req.body.date_fin),
-            statut: 'pending', // Statut par défaut
+            user_id: new mongoose.Types.ObjectId(user_id),
+            hotel_id: new mongoose.Types.ObjectId(hotel_id),
+            date_debut: new Date(date_debut),
+            date_fin: new Date(date_fin),
+            statut: 'pending',
         });
 
         const savedReservation = await newReservation.save();
-        io.emit('new_notification', { message: `Réservation réussie pour ${req.body.nom}` });
 
-        let mailOptions = {
-            from: 'adiaratououmyfall@gmail.com',
-            to: req.body.email,
-            subject: 'Confirmation de réservation',
-            text: `Votre réservation pour ${req.body.nom} est en attente de confirmation après le paiement.`,
+        // Construire les paramètres pour PayTech
+        let params = {
+            item_name: "Réservation chambre",
+            item_price: "560000", // Prix de la réservation
+            currency: "XOF",
+            ref_command: savedReservation._id, // Utiliser l'ID de la réservation comme référence
+            command_name: `Réservation pour ${nom}`,
+            env: "test",
+            ipn_url: "https://1385-154-125-150-201.ngrok-free.app/ipn",
+            success_url: "https://1385-154-125-150-201.ngrok-free.app/success",
+            cancel_url: "https://1385-154-125-150-201.ngrok-free.app/cancel",
+            custom_field: JSON.stringify({
+                user_id: user_id,
+                hotel_id: hotel_id,
+            })
         };
 
-        await transporter.sendMail(mailOptions);
-        res.status(201).json(savedReservation);
+        // Envoi de la demande de paiement à PayTech
+        const paymentRequestUrl = "https://paytech.sn/api/payment/request-payment";
+        const headers = {
+            Accept: "application/json",
+            'Content-Type': "application/json",
+            API_KEY: "61cc25223eb4a5834be3d62c5351a16ef1ec7bed42348fe4741dc43b4af5721b",
+            API_SECRET: "479ed9a49c6fecac358c65655c525788679f2dbaea2818bbf4a4e8cba62d07b3",
+        };
+
+        const paymentResponse = await fetch(paymentRequestUrl, {
+            method: 'POST',
+            body: JSON.stringify(params),
+            headers: headers
+        });
+
+        const jsonResponse = await paymentResponse.json();
+
+        if (jsonResponse.success) {
+            // Envoyer l'e-mail de confirmation
+            let mailOptions = {
+                from: 'adiaratououmyfall@gmail.com',
+                to: email,
+                subject: 'Confirmation de réservation',
+                text: `Votre réservation pour ${nom} est en attente de confirmation après le paiement. Vous pouvez procéder au paiement en suivant ce lien : ${jsonResponse.redirect_url}`,
+            };
+
+            await transporter.sendMail(mailOptions);
+
+            // Rediriger l'utilisateur vers l'URL de paiement de PayTech
+            return res.status(200).json({ message: "Réservation créée avec succès, veuillez procéder au paiement.", paymentUrl: jsonResponse.redirect_url });
+        } else {
+            return res.status(500).json({ message: "Erreur lors du traitement du paiement" });
+        }
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Erreur lors de la création de la réservation", error: error.message });
@@ -160,8 +203,6 @@ const confirmReservation = async (req, res) => {
     }
 };
 
-
-
 module.exports = {
     createReservation,
     confirmReservation,
@@ -169,5 +210,4 @@ module.exports = {
     getReservationById,
     updateReservation,
     deleteReservation,
-    confirmReservation,
 };

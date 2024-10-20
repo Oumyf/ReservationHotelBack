@@ -1,83 +1,135 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid'); // To generate unique ids
+const multer = require('multer');
+const { body, validationResult } = require('express-validator');
 const User = require('../models/user');
+const Hotel = require('../models/hotel.model');
 const router = express.Router();
 
-// Route d'inscription
-router.post('/register', async (req, res) => {
-    const { nom, email, password, telephone, adresse, role } = req.body;
+router.use(express.json()); // Middleware pour parser le JSON
 
-    // Validation des entrées
-    if (!nom || !email || !password || !telephone || !adresse || !role) {
-        return res.status(400).json({ message: 'All fields are required.' });
-    }
-
-    try {
-        // Vérification si l'utilisateur existe déjà
-        const userExists = await User.findOne({ email });
-        if (userExists) {
-            return res.status(400).json({ message: 'User already exists' });
-        }
-
-        // Hash du mot de passe
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Générer un ID unique
-        const userId = uuidv4();
-
-        // Enregistrement de l'utilisateur avec toutes les informations
-        const newUser = new User({
-            id: userId,
-            nom,
-            email,
-            password: hashedPassword,
-            telephone,
-            adresse,
-            role
-        });
-        await newUser.save();
-
-        res.status(201).json({ message: 'User registered successfully', userId: newUser._id });
-    } catch (error) {
-        console.error('Error during registration:', error); 
-        res.status(500).json({ message: 'Server error', error });
+// Configuration de Multer pour le stockage de fichiers
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${Date.now()}-${file.originalname}`);
     }
 });
 
-// Route de connexion (login)
+const fileFilter = (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+        return cb(new Error('Seuls les fichiers images sont autorisés !'), false);
+    }
+    cb(null, true);
+};
+
+const upload = multer({ storage, fileFilter });
+
+// Route pour l'inscription d'utilisateur (Client)
+router.post('/register/client', [
+    body('nom').notEmpty().withMessage('Le nom est requis.'),
+    body('email').isEmail().withMessage('L\'email est invalide.'),
+    body('password').isLength({ min: 6 }).withMessage('Le mot de passe doit contenir au moins 6 caractères.'),
+    body('telephone').isLength({ min: 9, max: 9 }).withMessage('Le téléphone doit contenir exactement 9 chiffres.'),
+    body('adresse').notEmpty().withMessage('L\'adresse est requise.')
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { nom, email, password, telephone, adresse } = req.body;
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = new User({
+            nom,
+            email: email.toLowerCase(),
+            password: hashedPassword,
+            telephone,
+            adresse,
+            role: 'client'
+        });
+
+        await user.save();
+        res.status(201).json({ message: 'Inscription réussie pour le client!' });
+    } catch (error) {
+        console.error('Erreur lors de l\'inscription:', error);
+        res.status(500).json({ error: 'Erreur lors de l\'inscription' });
+    }
+});
+
+// Route pour l'inscription d'hôtel
+router.post('/register/hotel', upload.single('logo'), [
+    body('nom').notEmpty().withMessage('Le nom est requis.'),
+    body('email').isEmail().withMessage('L\'email est invalide.'),
+    body('password').isLength({ min: 6 }).withMessage('Le mot de passe doit contenir au moins 6 caractères.'),
+    body('telephone').isLength({ min: 9, max: 9 }).withMessage('Le téléphone doit contenir exactement 9 chiffres.'),
+    body('adresse').notEmpty().withMessage('L\'adresse est requise.'),
+    body('nombre_etoiles').isInt({ min: 1, max: 5 }).withMessage('Le nombre d\'étoiles doit être entre 1 et 5.'),
+    body('description').notEmpty().withMessage('La description est requise.')
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { nom, email, password, telephone, adresse, nombre_etoiles, description } = req.body;
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = new User({
+            nom,
+            email: email.toLowerCase(),
+            password: hashedPassword,
+            telephone,
+            adresse,
+            role: 'hotel'
+        });
+
+        await user.save();
+
+        const hotel = new Hotel({
+            user: user._id,
+            nombre_etoiles,
+            description,
+            logo: req.file ? req.file.path : null,
+        });
+
+        await hotel.save();
+        res.status(201).json({ message: 'Inscription réussie pour l\'hôtel!' });
+    } catch (error) {
+        console.error('Erreur lors de l\'inscription:', error);
+        res.status(500).json({ error: 'Erreur lors de l\'inscription' });
+    }
+});
+
+// Route pour la connexion de l'utilisateur
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
-    // Validation des entrées
     if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required.' });
+        return res.status(400).json({ message: 'L\'email et le mot de passe sont requis.' });
     }
 
     try {
-        // Vérifier si l'utilisateur existe
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: email.toLowerCase() });
         if (!user) {
-            return res.status(400).json({ message: 'User not found' });
+            return res.status(400).json({ message: 'Utilisateur non trouvé.' });
         }
 
-        // Vérifier si le mot de passe est correct
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            return res.status(400).json({ message: 'Invalid credentials' });
+            return res.status(400).json({ message: 'Identifiants invalides.' });
         }
 
-        // Générer un token JWT
-        const token = jwt.sign(
-            { id: user._id, email: user.email, role: user.role },
-            process.env.JWT_SECRET, // Utilise une clé secrète depuis les variables d'environnement
-            { expiresIn: '1h' } // Le token expire dans 1 heure
-        );
+        const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-        // Retourner le token et l'utilisateur
         res.status(200).json({
-            message: 'Login successful',
+            message: 'Connexion réussie',
             token,
             user: {
                 id: user._id,
@@ -87,10 +139,13 @@ router.post('/login', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error during login:', error);
-        res.status(500).json({ message: 'Server error', error });
+        console.error('Erreur lors de la connexion :', error);
+        res.status(500).json({ message: 'Erreur du serveur' });
     }
 });
 
+router.post('/logout', (req, res) => {
+    res.json({ message: 'Déconnexion réussie' });
+});
 
 module.exports = router;

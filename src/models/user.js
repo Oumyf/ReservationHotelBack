@@ -2,11 +2,6 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const userSchema = new Schema({
-    id: {
-        type: String,
-        required: true,
-        unique: true,
-    },
     nom: {
         type: String,
         required: true,
@@ -23,7 +18,7 @@ const userSchema = new Schema({
     role: {
         type: String,
         required: true,
-        enum: ['user', 'admin', 'hotel'],
+        enum: ['client', 'admin', 'hotel'],
     },
     telephone: {
         type: String,
