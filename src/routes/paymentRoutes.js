@@ -1,4 +1,3 @@
-// routes/paytech.js
 const express = require('express');
 const router = express.Router();
 const PaytechController = require('../controllers/payement.controller');

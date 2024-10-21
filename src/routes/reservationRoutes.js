@@ -1,12 +1,18 @@
 const express = require('express');
-const router = express.Router();
-const reservationController = require('../controllers/reservation.controller');
+const {
+    createReservation,
+    updateReservationStatus,
+    getReservations,
+    getReservationById,
+    handlePaymentSuccess
+} = require('../controllers/reservation.controller');  // Make sure this path is correct
 
-// Routes pour les réservations
-router.post('/reservations', reservationController.createReservation);
-router.get('/reservations', reservationController.getReservations);
-router.get('/reservations/:id', reservationController.getReservationById);
-router.put('/reservations/:id', reservationController.updateReservation);
-router.delete('/reservations/:id', reservationController.deleteReservation);
+const router = express.Router();
+
+// Define the reservation routes
+router.post('/reservations', createReservation); // Create reservation
+router.put('/reservations/:id', updateReservationStatus); // Update reservation status
+router.get('/reservations', getReservations); // Get all reservations
+router.get('/reservations/:id', getReservationById); // Get reservation by ID
 
 module.exports = router;

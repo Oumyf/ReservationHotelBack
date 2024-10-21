@@ -1,14 +1,9 @@
 const mongoose = require('mongoose');
 const nodemailer = require('nodemailer');
 const Reservation = require('../models/reservations');
-const http = require('http');
+const fetch = require('node-fetch');
 const express = require('express');
-const fetch = require('node-fetch'); // Import fetch for making HTTP requests
-const app = express();
-const server = http.createServer(app);
-const io = require('socket.io')(server);
 
-// Create the transporter
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -17,25 +12,41 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-// Create a reservation
-const createReservation = async (req, res) => {
+// Fonction pour mettre à jour le statut de la réservation
+const updateReservationStatus = async (req, res) => {
+    const { reservationId, status } = req.body;
+
+    if (!reservationId || !status) {
+        return res.status(400).json({ message: "L'ID de réservation et le statut sont requis." });
+    }
+
     try {
-        // Validation des données entrantes
-        const { user_id, hotel_id, date_debut, date_fin, email, nom } = req.body;
-        
-        if (!user_id || !hotel_id || !date_debut || !date_fin || !email || !nom) {
-            const missingFields = [];
-            if (!user_id) missingFields.push('user_id');
-            if (!hotel_id) missingFields.push('hotel_id');
-            if (!date_debut) missingFields.push('date_debut');
-            if (!date_fin) missingFields.push('date_fin');
-            if (!email) missingFields.push('email');
-            if (!nom) missingFields.push('nom');
-        
-            return res.status(400).json({ message: "Tous les champs sont requis.", missingFields });
+        const updatedReservation = await Reservation.findByIdAndUpdate(
+            reservationId,
+            { statut: status },
+            { new: true }
+        );
+
+        if (!updatedReservation) {
+            return res.status(404).json({ message: "Réservation non trouvée." });
         }
 
-        // Créer la réservation (statut par défaut 'pending')
+        io.emit('reservation_status_updated', { reservationId, status });
+        res.status(200).json(updatedReservation);
+    } catch (error) {
+        res.status(500).json({ message: "Erreur lors de la mise à jour de la réservation", error: error.message });
+    }
+};
+
+// Créer une réservation
+const createReservation = async (req, res) => {
+    try {
+        const { user_id, hotel_id, date_debut, date_fin, email, nom } = req.body;
+
+        if (!user_id || !hotel_id || !date_debut || !date_fin || !email || !nom) {
+            return res.status(400).json({ message: "Tous les champs sont requis." });
+        }
+
         const newReservation = new Reservation({
             user_id: new mongoose.Types.ObjectId(user_id),
             hotel_id: new mongoose.Types.ObjectId(hotel_id),
@@ -46,24 +57,22 @@ const createReservation = async (req, res) => {
 
         const savedReservation = await newReservation.save();
 
-        // Construire les paramètres pour PayTech
-        let params = {
+        const params = {
             item_name: "Réservation chambre",
-            item_price: "560000", // Prix de la réservation
+            item_price: "560000",
             currency: "XOF",
-            ref_command: savedReservation._id, // Utiliser l'ID de la réservation comme référence
+            ref_command: savedReservation._id,
             command_name: `Réservation pour ${nom}`,
             env: "test",
             ipn_url: "https://1385-154-125-150-201.ngrok-free.app/ipn",
-            success_url: "https://1385-154-125-150-201.ngrok-free.app/success",
+            success_url: `https://1385-154-125-150-201.ngrok-free.app/success/${savedReservation._id}`, // URL de succès mise à jour
             cancel_url: "https://1385-154-125-150-201.ngrok-free.app/cancel",
             custom_field: JSON.stringify({
                 user_id: user_id,
                 hotel_id: hotel_id,
-            })
+            }),
         };
 
-        // Envoi de la demande de paiement à PayTech
         const paymentRequestUrl = "https://paytech.sn/api/payment/request-payment";
         const headers = {
             Accept: "application/json",
@@ -75,14 +84,13 @@ const createReservation = async (req, res) => {
         const paymentResponse = await fetch(paymentRequestUrl, {
             method: 'POST',
             body: JSON.stringify(params),
-            headers: headers
+            headers: headers,
         });
 
         const jsonResponse = await paymentResponse.json();
 
         if (jsonResponse.success) {
-            // Envoyer l'e-mail de confirmation
-            let mailOptions = {
+            const mailOptions = {
                 from: 'adiaratououmyfall@gmail.com',
                 to: email,
                 subject: 'Confirmation de réservation',
@@ -91,7 +99,6 @@ const createReservation = async (req, res) => {
 
             await transporter.sendMail(mailOptions);
 
-            // Rediriger l'utilisateur vers l'URL de paiement de PayTech
             return res.status(200).json({ message: "Réservation créée avec succès, veuillez procéder au paiement.", paymentUrl: jsonResponse.redirect_url });
         } else {
             return res.status(500).json({ message: "Erreur lors du traitement du paiement" });
@@ -102,6 +109,30 @@ const createReservation = async (req, res) => {
     }
 };
 
+// Route de succès : Mettre à jour le statut en "confirmed"
+const handlePaymentSuccess = async (req, res) => {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+        return res.status(400).json({ message: "ID de réservation invalide." });
+    }
+
+    try {
+        const updatedReservation = await Reservation.findByIdAndUpdate(
+            id,
+            { statut: 'confirmed' },
+            { new: true }
+        );
+
+        if (!updatedReservation) {
+            return res.status(404).json({ message: "Réservation non trouvée." });
+        }
+
+        res.status(200).json({ message: "Paiement réussi, statut de la réservation mis à jour.", reservation: updatedReservation });
+    } catch (error) {
+        res.status(500).json({ message: "Erreur lors de la mise à jour du statut après succès de paiement", error: error.message });
+    }
+};
 
 // Récupérer toutes les réservations
 const getReservations = async (req, res) => {
@@ -115,10 +146,16 @@ const getReservations = async (req, res) => {
 
 // Récupérer une réservation par ID
 const getReservationById = async (req, res) => {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+        return res.status(400).json({ message: "ID de réservation invalide." });
+    }
+
     try {
-        const reservation = await Reservation.findById(req.params.id);
+        const reservation = await Reservation.findById(id);
         if (!reservation) {
-            return res.status(404).json({ message: "Réservation non trouvée" });
+            return res.status(404).json({ message: "Réservation non trouvée." });
         }
         res.status(200).json(reservation);
     } catch (error) {
@@ -126,88 +163,11 @@ const getReservationById = async (req, res) => {
     }
 };
 
-// Mettre à jour une réservation
-const updateReservation = async (req, res) => {
-    try {
-        const updatedReservation = await Reservation.findByIdAndUpdate(
-            req.params.id,
-            {
-                user_id: req.body.user_id,
-                hotel_id: req.body.hotel_id,
-                date_debut: req.body.date_debut,
-                date_fin: req.body.date_fin,
-                statut: req.body.statut,
-            },
-            { new: true }
-        );
-
-        if (!updatedReservation) {
-            return res.status(404).json({ message: "Réservation non trouvée" });
-        }
-
-        res.status(200).json(updatedReservation);
-    } catch (error) {
-        res.status(500).json({ message: "Erreur lors de la mise à jour de la réservation", error: error.message });
-    }
-};
-
-// Supprimer une réservation
-const deleteReservation = async (req, res) => {
-    try {
-        const deletedReservation = await Reservation.findByIdAndDelete(req.params.id);
-
-        if (!deletedReservation) {
-            return res.status(404).json({ message: "Réservation non trouvée" });
-        }
-
-        res.status(200).json({ message: "Réservation supprimée avec succès" });
-    } catch (error) {
-        res.status(500).json({ message: "Erreur lors de la suppression de la réservation", error: error.message });
-    }
-};
-
-// Confirm a reservation after payment and send confirmation email
-const confirmReservation = async (req, res) => {
-    try {
-        const { reservationId, email, nom } = req.body;
-
-        if (!reservationId || !email || !nom) {
-            return res.status(400).json({ message: "L'ID de réservation, l'email et le nom sont requis." });
-        }
-
-        const updatedReservation = await Reservation.findByIdAndUpdate(
-            reservationId,
-            { statut: 'confirmed' },
-            { new: true }
-        );
-
-        if (!updatedReservation) {
-            return res.status(404).json({ message: "Réservation non trouvée" });
-        }
-
-        // Émettre l'événement de réservation confirmée
-        io.emit('reservation_confirmed', { reservationId, message: 'Votre réservation a été confirmée!' });
-
-        let mailOptions = {
-            from: 'adiaratououmyfall@gmail.com',
-            to: email,
-            subject: 'Confirmation de votre réservation',
-            text: `Votre réservation pour ${nom} a été confirmée avec succès. Merci de choisir notre service!`,
-        };
-
-        await transporter.sendMail(mailOptions);
-
-        res.status(200).json(updatedReservation);
-    } catch (error) {
-        res.status(500).json({ message: "Erreur lors de la confirmation de la réservation", error: error.message });
-    }
-};
-
+// Export des fonctions
 module.exports = {
     createReservation,
-    confirmReservation,
     getReservations,
     getReservationById,
-    updateReservation,
-    deleteReservation,
+    updateReservationStatus,
+    handlePaymentSuccess,
 };
