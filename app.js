@@ -61,6 +61,8 @@ io.on('connection', (socket) => {
   });
 });
 
+
+
 // SHA256 encryption function
 function SHA256Encrypt(password) {
   const sha256 = crypto.createHash('sha256');

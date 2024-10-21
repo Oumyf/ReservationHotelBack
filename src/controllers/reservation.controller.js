@@ -41,7 +41,7 @@ const updateReservationStatus = async (req, res) => {
 // Créer une réservation
 const createReservation = async (req, res) => {
     try {
-        const { user_id, hotel_id, date_debut, date_fin, email, nom } = req.body;
+        const { user_id, hotel_id, chambre_id, date_debut, date_fin, email, nom } = req.body;
 
         if (!user_id || !hotel_id || !date_debut || !date_fin || !email || !nom) {
             return res.status(400).json({ message: "Tous les champs sont requis." });
@@ -50,6 +50,7 @@ const createReservation = async (req, res) => {
         const newReservation = new Reservation({
             user_id: new mongoose.Types.ObjectId(user_id),
             hotel_id: new mongoose.Types.ObjectId(hotel_id),
+            chambre_id: new mongoose.Types.ObjectId(chambre_id),
             date_debut: new Date(date_debut),
             date_fin: new Date(date_fin),
             statut: 'pending',
@@ -70,6 +71,8 @@ const createReservation = async (req, res) => {
             custom_field: JSON.stringify({
                 user_id: user_id,
                 hotel_id: hotel_id,
+                chambre_id: chambre_id,
+
             }),
         };
 
@@ -163,6 +166,27 @@ const getReservationById = async (req, res) => {
     }
 };
 
+// Récupérer les réservations d'un utilisateur spécifique
+const getReservationsByUser = async (req, res) => {
+    const { userId } = req.params;
+
+    if (!userId || !mongoose.isValidObjectId(userId)) {
+        return res.status(400).json({ message: "ID utilisateur invalide." });
+    }
+
+    try {
+        const reservations = await Reservation.find({ user_id: userId });
+
+        if (!reservations || reservations.length === 0) {
+            return res.status(404).json({ message: "Aucune réservation trouvée pour cet utilisateur." });
+        }
+
+        res.status(200).json(reservations);
+    } catch (error) {
+        res.status(500).json({ message: "Erreur lors de la récupération des réservations", error: error.message });
+    }
+};
+
 // Export des fonctions
 module.exports = {
     createReservation,
@@ -170,4 +194,6 @@ module.exports = {
     getReservationById,
     updateReservationStatus,
     handlePaymentSuccess,
+    getReservationsByUser,
+
 };

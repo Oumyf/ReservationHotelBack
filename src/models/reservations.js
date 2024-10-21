@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const ReservationSchema = new mongoose.Schema({
     user_id: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
     hotel_id: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'Hotel' },
+    chambre_id: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'Chambre' },
     date_debut: { type: Date, required: true },
     date_fin: { type: Date, required: true },
     statut: { 
