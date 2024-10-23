@@ -12,7 +12,7 @@ const router = express.Router();
 
 // Define the reservation routes
 router.post('/reservations', createReservation); // Create reservation
-router.put('/reservations/:id', updateReservationStatus); // Update reservation status
+// router.put('/reservations/:id', updateReservationStatus); // Update reservation status
 router.get('/reservations', getReservations); // Get all reservations
 router.get('/reservations/:id', getReservationById); // Get reservation by ID
 // Route pour obtenir les réservations par utilisateur

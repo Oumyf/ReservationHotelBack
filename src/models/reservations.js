@@ -12,6 +12,7 @@ const ReservationSchema = new mongoose.Schema({
         default: 'pending', // Valeur par défaut
         required: true 
     },
+    email: { type: String, required: true }, // Ensure email is included
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
