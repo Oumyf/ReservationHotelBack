@@ -8,8 +8,8 @@ const ReservationSchema = new mongoose.Schema({
     date_fin: { type: Date, required: true },
     statut: { 
         type: String, 
-        enum: ['pending', 'confirmed'], // Enumération pour le statut
-        default: 'pending', // Valeur par défaut
+        enum: ['en attente', 'confirmée'], // Enumération pour le statut
+        default: 'en attente', // Valeur par défaut
         required: true 
     },
     email: { type: String, required: true }, // Ensure email is included

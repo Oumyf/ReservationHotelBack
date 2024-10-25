@@ -22,7 +22,7 @@ const transporter = nodemailer.createTransport({
 // Fonction pour générer un QR code
 const generateQRCode = async (reservationId) => {
     try {
-        const qrData = ` https://3de1-154-125-148-217.ngrok-free.app/reservation/${reservationId}`; // Lien vers les détails de la réservation
+        const qrData = `https://10e8-154-125-148-217.ngrok-free.app/reservations/${reservationId}`; // Lien vers les détails de la réservation
         const qrCode = await QRCode.toDataURL(qrData); // Génère le QR code en base64
         return qrCode;
     } catch (err) {
@@ -153,7 +153,7 @@ const createReservation = async (req, res) => {
             chambre_id: new mongoose.Types.ObjectId(chambre_id),
             date_debut: new Date(date_debut),
             date_fin: new Date(date_fin),
-            statut: 'pending',
+            statut: 'en attente',
             email: email 
         });
 
@@ -166,9 +166,9 @@ const createReservation = async (req, res) => {
             ref_command: savedReservation._id,
             command_name: `Réservation pour ${nom}`,
             env: "test",
-            ipn_url: "  https://3de1-154-125-148-217.ngrok-free.app/ipn",
-            success_url: `  https://3de1-154-125-148-217.ngrok-free.app/success/${savedReservation._id}`,
-            cancel_url: "  https://3de1-154-125-148-217.ngrok-free.app/cancel",
+            ipn_url: "https://10e8-154-125-148-217.ngrok-free.app/ipn",
+            success_url: `https://10e8-154-125-148-217.ngrok-free.app/success/${savedReservation._id}`,
+            cancel_url: "https://10e8-154-125-148-217.ngrok-free.app/cancel",
             custom_field: JSON.stringify({
                 user_id: user_id,
                 hotel_id: hotel_id,
@@ -212,7 +212,7 @@ const createReservation = async (req, res) => {
     }
 };
 
-// Route de succès : Mettre à jour le statut en "confirmed"
+// Route de succès : Mettre à jour le statut en "confirmé"
 const handlePaymentSuccess = async (req, res) => {
     const { id } = req.params;
 
@@ -223,7 +223,7 @@ const handlePaymentSuccess = async (req, res) => {
     try {
         const updatedReservation = await Reservation.findByIdAndUpdate(
             id,
-            { statut: 'confirmed' },
+            { statut: 'confirmé' },
             { new: true }
         );
 
@@ -235,6 +235,7 @@ const handlePaymentSuccess = async (req, res) => {
 
         res.status(200).json({ message: "Paiement réussi, statut de la réservation mis à jour.", reservation: updatedReservation });
     } catch (error) {
+        console.error('Erreur lors de la mise à jour de la réservation ou de l\'envoi de l\'e-mail', error);
         res.status(500).json({ message: "Erreur lors de la mise à jour de la réservation", error: error.message });
     }
 };
