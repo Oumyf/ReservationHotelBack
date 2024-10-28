@@ -5,14 +5,15 @@ const Reservation = require('../models/reservations'); // Modèle de réservatio
 const Hotel = require('../models/hotel.model');
 
 // Fonction pour vérifier si l'utilisateur a réservé une chambre dans l'hôtel
+// Supposons que votre modèle de réservation est 'Reservation'
 async function verifierReservation(userId, hotelId) {
-    return await Reservation.findOne({
-      user_id: userId,
-      hotel_id: hotelId,
-      statut: "confirmée"
-    });
-  }
-  
+  return await Reservation.findOne({
+    user_id: userId,
+    hotel_id: hotelId,
+    statut: "confirmé"
+  });
+}
+
 
 // Fonction pour ajouter un avis (note ou commentaire)
 exports.ajouterAvis = async (req, res) => {

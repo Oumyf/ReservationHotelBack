@@ -148,4 +148,27 @@ router.post('/logout', (req, res) => {
     res.json({ message: 'Déconnexion réussie' });
 });
 
+// Route pour récupérer les utilisateurs par IDs
+router.get('/users', async (req, res) => {
+    try {
+        const { ids } = req.query;
+        
+        // Si `ids` est fourni, filtrer les utilisateurs en fonction des IDs spécifiés
+        if (ids) {
+            const idsArray = Array.isArray(ids) ? ids : ids.split(','); // Assurez-vous que `ids` est un tableau
+            const users = await User.find({ _id: { $in: idsArray } }, '-password'); // Exclure le mot de passe
+            return res.status(200).json(users);
+        }
+
+        // Sinon, retourner tous les utilisateurs (comportement par défaut)
+        const users = await User.find({}, '-password');
+        res.status(200).json(users);
+    } catch (error) {
+        console.error('Erreur lors de la récupération des utilisateurs:', error);
+        res.status(500).json({ message: 'Erreur du serveur lors de la récupération des utilisateurs' });
+    }
+});
+
+
+
 module.exports = router;
