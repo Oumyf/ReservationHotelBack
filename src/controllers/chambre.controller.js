@@ -100,3 +100,24 @@ exports.deleteChambre = async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur', error: error.message });
   }
 };
+
+// Search chambres based on availability, price, capacity, and type
+exports.searchChambres = async (req, res) => {
+  try {
+    const { disponibilite, minPrix, maxPrix, nombreDePersonnes } = req.query;
+
+    const filter = {};
+    if (disponibilite) filter.disponibilite = disponibilite === 'true';
+    if (minPrix) filter.prix = { ...filter.prix, $gte: parseFloat(minPrix) };
+    if (maxPrix) filter.prix = { ...filter.prix, $lte: parseFloat(maxPrix) };
+    if (nombreDePersonnes) filter.nombreDePersonnes = { $gte: parseInt(nombreDePersonnes) };
+
+    const chambres = await Chambre.find(filter);
+    res.status(200).json(chambres);
+  } catch (error) {
+    console.error('Erreur lors de la recherche des chambres:', error);
+    res.status(500).json({ message: 'Erreur serveur', error: error.message });
+  }
+};
+
+
