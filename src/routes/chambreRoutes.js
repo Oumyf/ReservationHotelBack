@@ -9,7 +9,7 @@ router.post('/chambres', chambreController.upload.single('image'), chambreContro
 router.get('/chambres', chambreController.getChambres);
 router.get('/chambres/:id', chambreController.getChambreById);
 router.get('/hotels/:hotelId/chambres', chambreController.getChambresByHotelId);
-router.put('/chambres/:id', chambreController.updateChambre);
+router.put('/chambres/:id', chambreController.upload.single('image'), chambreController.updateChambre);
 router.delete('/chambres/:id', chambreController.deleteChambre);
 
 
