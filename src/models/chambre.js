@@ -8,7 +8,7 @@ const chambreSchema = new mongoose.Schema({
   disponibilite: { type: Boolean, required: true },
   hotelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hotel' },
   nombreDePersonnes: { type: Number, required: true },
-  image: { type: String }
+  images: { type: [String], required: true } // Un tableau pour les URLs d'images
 });
 
 
