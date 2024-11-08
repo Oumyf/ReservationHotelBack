@@ -43,9 +43,11 @@ app.use('/api/paytech', paymentRoutes);
 
 // Serve static files from "uploads" folder
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const mongoURI = process.env.DB;
+
 
 // MongoDB connection
-mongoose.connect('mongodb://localhost:27017/reservation_hotel')
+mongoose.connect(mongoURI)
   .then(() => console.log('Connected to MongoDB successfully'))
   .catch((err) => console.error('Failed to connect to MongoDB', err));
 
