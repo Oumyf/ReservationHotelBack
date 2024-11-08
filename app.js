@@ -32,6 +32,10 @@ app.use(cors({
 }));
 
 app.use(express.json());
+// Route pour la page d'accueil
+app.get('/', (req, res) => {
+  res.send('Bienvenue sur Keur Teranga !');
+});
 
 app.use('/api', hotelRoutes);
 app.use('/api', reservationRoutes);
